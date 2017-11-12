@@ -22,4 +22,21 @@ def recognize(models: dict, test_set: SinglesData):
     guesses = []
     # TODO implement the recognizer
     # return probabilities, guesses
-    raise NotImplementedError
+    words = test_set.get_all_Xlengths()
+    for word_id in range(len(test_set.get_all_sequences())):
+        prob_dict = dict()
+        highest_score = float('-inf')
+        guess = None
+        X, lengths = words[word_id]
+        for word, hmm_model in models.items():
+            try:
+                curr_score = hmm_model.score(X, lengths)
+                prob_dict[word] = curr_score
+                if curr_score > highest_score:
+                    highest_score = curr_score
+                    guess = word
+            except:
+                prob_dict[word] = highest_score
+        probabilities.append(prob_dict)
+        guesses.append(guess)
+    return probabilities, guesses

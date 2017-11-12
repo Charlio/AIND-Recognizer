@@ -77,7 +77,22 @@ class SelectorBIC(ModelSelector):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         # TODO implement model selection based on BIC scores
-        raise NotImplementedError
+        best_hmm_model = None
+        lowest_BIC = float('inf')
+        n = len(self.lengths)
+        logN = np.log(n)
+        for i in range(self.min_n_components, self.max_n_components+1):
+            try:
+                hmm_model = self.base_model(i) 
+                logL = hmm_model.score(self.X, self.lengths)
+                p = n**2 + 2*i*n - 1
+                bic = -2*logL + p*logN
+                if bic < lowest_BIC:
+                    lowest_BIC = bic
+                    best_hmm_model = hmm_model
+            except:
+                continue
+        return best_hmm_model
 
 
 class SelectorDIC(ModelSelector):
@@ -94,7 +109,23 @@ class SelectorDIC(ModelSelector):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         # TODO implement model selection based on DIC scores
-        raise NotImplementedError
+        best_hmm_model = None
+        highest_DIC = float('-inf')
+        for i in range(self.min_n_components, self.max_n_components+1):
+            try:
+                hmm_model = self.base_model(i)
+                other_scores = []
+                for word in self.words.keys():
+                    if word != self.this_word:
+                        X, lengths = self.all_word_Xlengths[word]
+                        other_scores.append(hmm_model.score(X, lengths))
+                dic = hmm_model.score(self.X, self.lengths) - np.mean(other_scores)
+                if dic > highest_DIC:
+                    highest_DIC = dic
+                    best_hmm_model = hmm_model
+            except:
+                continue
+        return best_hmm_model or self.base_model(self.n_constant)
 
 
 class SelectorCV(ModelSelector):
@@ -106,4 +137,23 @@ class SelectorCV(ModelSelector):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         # TODO implement model selection using CV
-        raise NotImplementedError
+        highest_score = float('-inf')
+        best_hmm_model = None
+        for i in range(self.min_n_components, self.max_n_components+1):
+            try:
+                split_method = KFold()
+                logLs = []
+                for cv_train_idx, cv_test_idx in split_method.split(self.sequences):
+                    self.X, self.lengths = combine_sequences(cv_train_idx, self.sequences)
+                    hmm_model = self.base_model(i)
+                    test_X, test_lengths = combine_sequences(cv_test_idx, self.sequences)
+                    logL = hmm_model.score(test_X, test_lengths)
+                    logLs.append(logL)
+                avg_score = np.mean(logLs)
+                if avg_score > highest_score:
+                    highest_score = avg_score
+                    best_hmm_model = hmm_model
+            except:
+                continue
+        return best_hmm_model or self.base_model(self.n_constant)        
+        
